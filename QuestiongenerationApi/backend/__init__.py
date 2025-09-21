@@ -12,8 +12,9 @@ def create_app():
         from backend.utils.database import init_db
         init_db()
 
-   
-    from backend.routes import auth
+
+    from backend.routes import auth, questions
     app.register_blueprint(auth.bp)
+    app.register_blueprint(questions.bp)
 
     return app

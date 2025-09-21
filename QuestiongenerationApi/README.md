@@ -1,10 +1,10 @@
 # Question Generation API
 
-Basic Flask API with user authentication. Uses MySQL for data storage.
+Flask API with user auth and question generation using Google FLAN-T5.
 
 ## Setup
 
-1. Create and activate virtual environment:
+1. Create venv and activate:
 
 ```bash
 python -m venv venv
@@ -12,74 +12,56 @@ venv\Scripts\activate  # Windows
 source venv/bin/activate  # Linux/Mac
 ```
 
-2. Install dependencies:
+2. Install packages:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Install and start MySQL server, then update .env file with your database credentials:
+3. Setup MySQL and create .env file:
 
 ```
-SECRET_KEY=your-secret-key-here
-JWT_SECRET=your-jwt-secret-here
+SECRET_KEY=your-secret-key
+JWT_SECRET=your-jwt-secret
 DB_HOST=localhost
 DB_USER=root
-DB_PASSWORD=your_mysql_password
+DB_PASSWORD=your_password
 DB_NAME=question_api
 ```
 
-5. Run the app:
+4. Run:
 
 ```bash
 python run.py
 ```
 
-The app will create the users table automatically on first run.
+## Endpoints
 
-## API Endpoints
+**Auth:**
 
-### POST /auth/register
+- `POST /auth/register` - signup
+- `POST /auth/login` - get token
+- `GET /auth/me` - user info (needs Bearer token)
 
-Register a new user.
+**Questions:**
+
+- `GET /generate-question?text=your_text` - get ~3 questions
+
+Example:
+
+```
+GET /generate-question?text=Machine learning helps computers learn from data
+```
+
+Returns:
 
 ```json
 {
-  "email": "user@example.com",
-  "password": "password123"
+  "questions": [
+    "What is machine learning?",
+    "How do computers learn?",
+    "What is used for learning?"
+  ],
+  "count": 3
 }
 ```
-
-### POST /auth/login
-
-Login and get JWT token.
-
-```json
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-### GET /auth/me
-
-Get current user info (requires Authorization header).
-
-```
-Authorization: Bearer your_jwt_token_here
-```
-
-## Project Structure
-
-The app uses a standard Flask structure with separate folders for different components:
-
-- `backend/` - main application code
-- `backend/models/` - database models (user.py)
-- `backend/routes/` - API endpoints (auth.py)
-- `backend/middleware/` - authentication middleware
-- `backend/utils/` - helper functions and database connection
-- `config.py` - app configuration
-- `run.py` - entry point
-- `.env` - environment variables
-
-App runs on http://127.0.0.1:5000 by default.

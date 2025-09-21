@@ -38,7 +38,7 @@ def init_db():
         conn.commit()
         cursor.close()
         conn.close()
-        print("✓ Database and tables created successfully")
+        print("Database and tables created successfully")
     except Exception as e:
-        print(f"⚠ Database connection failed: {e}")
+        print(f"Database connection failed: {e}")
         print("App will start but database features won't work")
