@@ -32,10 +32,10 @@ def test_mysql_connection():
             charset=MYSQL_CONFIG['charset']
         )
         connection.close()
-        print("✓ MySQL connection successful!")
+        print("MySQL connection successful!")
         return True
     except mysql.connector.Error as e:
-        print(f"✗ MySQL connection failed: {e}")
+        print(f"MySQL connection failed: {e}")
         return False
 
 
@@ -155,7 +155,7 @@ def get_embedding_model():
             from sentence_transformers import SentenceTransformer
             print("Loading sentence-transformer model (first time may take a moment)...")
             _model_cache = SentenceTransformer('all-MiniLM-L6-v2')
-            print("✓ Model loaded successfully!")
+            print("Model loaded successfully!")
         except Exception as e:
             print(f"Failed to load sentence-transformer: {e}")
             _model_cache = False

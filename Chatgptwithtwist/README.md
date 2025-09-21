@@ -23,7 +23,28 @@ pip install -r requirements.txt
 # Configure MySQL credentials in config.py
 # Run the calculator
 python main.py
+
+# Run as MCP server
+python calculator_rag/calculator_mcp_server.py
 ```
+
+## MCP Integration
+
+To use this calculator as an MCP server in your editor, add this configuration:
+
+```json
+{
+  "mcpServers": {
+    "calculator-rag": {
+      "command": "python",
+      "args": ["path/to/calculator_rag/calculator_mcp_server.py"],
+      "env": {}
+    }
+  }
+}
+```
+
+Replace `path/to/` with your actual project path. The server provides tools for natural language calculations, balance checking, transaction history, and undo operations.
 
 ## Supported Users
 

@@ -1,3 +1,4 @@
+mcp[cli]
 mysql-connector-python
 sentence-transformers
 scikit-learn

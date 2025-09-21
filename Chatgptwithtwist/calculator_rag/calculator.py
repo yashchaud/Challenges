@@ -3,8 +3,8 @@ from datetime import datetime
 from database import store_calculation, get_calculations, search_calculations, delete_calculation
 
 user_balances = {}
-user_last_results = {}  # Track last result per user
-global_last_result = 0  # Only for sum_all operations
+user_last_results = {}
+global_last_result = 0
 
 
 def parse_transaction(text):
@@ -17,7 +17,6 @@ def parse_transaction(text):
     from_user = users[0] if users else "system"
     to_user = users[1] if len(users) > 1 else None
 
-    # Check if this references previous result
     has_previous_ref = any(phrase in text_lower for phrase in [
         "previous", "from previous", "to previous", "from last", "to last",
         "last number", "last result", "previous number", "previous result",
@@ -28,7 +27,6 @@ def parse_transaction(text):
     ])
 
     if has_previous_ref and amount > 0:
-        # Use last_result as the base for the operation
         pass
 
     operation = "add"
@@ -36,12 +34,17 @@ def parse_transaction(text):
         operation = "show_total"
     elif any(phrase in text_lower for phrase in ["sum all", "sum of all"]):
         operation = "sum_all"
+    elif any(phrase in text_lower for phrase in ["subtract all", "minus all", "reduce all"]):
+        operation = "subtract_all"
+    elif any(phrase in text_lower for phrase in ["multiply all", "times all"]):
+        operation = "multiply_all"
+    elif any(phrase in text_lower for phrase in ["divide all", "split all"]):
+        operation = "divide_all"
     elif any(phrase in text_lower for phrase in ["clear memory", "clear your memory", "reset memory"]):
         operation = "clear_memory"
     elif any(phrase in text_lower for phrase in ["delete all", "clear all", "reset all", "remove all"]):
         operation = "clear_all"
     elif any(word in text_lower for word in [
-        # Subtract synonyms - ALL forms of reduce should subtract
         "subtracts", "subtract", "minus", "reduce", "reduces", "reduced", "reducing",
         "decrease", "decreases", "decreased", "decreasing", "lower", "lowers", "lowered", "lowering",
         "deduct", "deducts", "deducted", "deducting", "less", "loses", "lost", "losing",
@@ -53,12 +56,10 @@ def parse_transaction(text):
     ]):
         operation = "subtract"
     elif any(phrase in text_lower for phrase in [
-        # Take from operations (special transfer case)
         "takes from", "removes from", "steals from", "gets from"
     ]):
         operation = "takes_from"
     elif any(word in text_lower for word in [
-        # Multiply synonyms
         "multiply", "multiplies", "multiplied", "times", "x", "*", "double", "doubles",
         "triple", "triples", "scale", "scales", "boost", "boosts"
     ]) or any(phrase in text_lower for phrase in [
@@ -66,7 +67,6 @@ def parse_transaction(text):
     ]):
         operation = "multiply"
     elif any(word in text_lower for word in [
-        # Divide synonyms
         "divide", "divides", "divided", "split", "splits", "half", "halve", "halves",
         "/", "share", "shares", "partition", "partitions"
     ]) or any(phrase in text_lower for phrase in [
@@ -74,13 +74,11 @@ def parse_transaction(text):
     ]):
         operation = "divide"
     elif any(word in text_lower for word in [
-        # Transfer synonyms
         "gives", "give", "transfers", "transfer", "sends", "send", "pays", "pay",
         "hands", "passes", "delivers", "provides"
     ]):
         operation = "transfer"
     elif any(word in text_lower for word in [
-        # Add synonyms (default)
         "has", "gets", "get", "receives", "receive", "adds", "add", "gains", "gain",
         "increases", "increase", "plus", "+", "grows", "grows", "raises", "raise"
     ]) or any(phrase in text_lower for phrase in [
@@ -111,22 +109,16 @@ def execute_transaction(transaction):
     if from_user not in user_last_results:
         user_last_results[from_user] = 0
 
-    # Handle previous references - use USER-SPECIFIC last result
     if has_previous_ref and operation in ["subtract", "add", "multiply", "divide"]:
         user_last = user_last_results[from_user]
 
-        # Determine the operand: use specified amount or the last result itself
         if amount == 0:
-            # No amount specified, check what kind of reference this is
             text_lower = transaction["original_text"].lower()
             if any(phrase in text_lower for phrase in ["last number", "last result", "previous number", "previous result"]):
-                # Use the last result as the operand
                 operand = user_last
             else:
-                # Default to 1 for phrases like "from last", "from previous"
                 operand = 1
         else:
-            # Use the specified amount
             operand = amount
 
         print(f"DEBUG: {from_user} {operation} {operand} from last result {user_last}")
@@ -167,12 +159,22 @@ def execute_transaction(transaction):
         }
 
     elif operation == "sum_all":
-        all_transactions = get_calculations(limit=1000)
-        total_sum = sum(calc['result'] for calc in all_transactions)
+        user_transactions = get_calculations(limit=1000, user=from_user)
+
+        transaction_amounts = []
+        previous_balance = 0
+
+        for calc in reversed(user_transactions):
+            current_result = calc['result']
+            transaction_amount = current_result - previous_balance
+            transaction_amounts.append(transaction_amount)
+            previous_balance = current_result
+
+        total_sum = sum(transaction_amounts)
         user_balances[from_user] = total_sum
         user_last_results[from_user] = total_sum
         global_last_result = total_sum
-        result_text = f"{from_user} now has {total_sum}"
+        result_text = f"{from_user} now has {total_sum} (sum of {len(transaction_amounts)} transactions)"
 
         store_calculation(
             query=transaction["original_text"],
@@ -213,6 +215,116 @@ def execute_transaction(transaction):
             "users": dict(user_balances)
         }
 
+    elif operation == "subtract_all":
+        user_transactions = get_calculations(limit=1000, user=from_user)
+        transaction_amounts = []
+        previous_balance = 0
+
+        for calc in reversed(user_transactions):
+            current_result = calc['result']
+            transaction_amount = current_result - previous_balance
+            transaction_amounts.append(transaction_amount)
+            previous_balance = current_result
+
+        if transaction_amounts:
+            result = transaction_amounts[0]
+            for amount in transaction_amounts[1:]:
+                result -= amount
+        else:
+            result = 0
+
+        user_balances[from_user] = result
+        user_last_results[from_user] = result
+        global_last_result = result
+        result_text = f"{from_user} now has {result} (subtracted {len(transaction_amounts)} transactions)"
+
+        store_calculation(
+            query=transaction["original_text"],
+            operation=operation,
+            result=result,
+            user=from_user
+        )
+
+        return {
+            "result": result,
+            "message": result_text,
+            "users": dict(user_balances)
+        }
+
+    elif operation == "multiply_all":
+        user_transactions = get_calculations(limit=1000, user=from_user)
+        transaction_amounts = []
+        previous_balance = 0
+
+        for calc in reversed(user_transactions):
+            current_result = calc['result']
+            transaction_amount = current_result - previous_balance
+            transaction_amounts.append(transaction_amount)
+            previous_balance = current_result
+
+        if transaction_amounts:
+            result = transaction_amounts[0]
+            for amount in transaction_amounts[1:]:
+                if amount != 0:
+                    result *= amount
+        else:
+            result = 0
+
+        user_balances[from_user] = result
+        user_last_results[from_user] = result
+        global_last_result = result
+        result_text = f"{from_user} now has {result} (multiplied {len(transaction_amounts)} transactions)"
+
+        store_calculation(
+            query=transaction["original_text"],
+            operation=operation,
+            result=result,
+            user=from_user
+        )
+
+        return {
+            "result": result,
+            "message": result_text,
+            "users": dict(user_balances)
+        }
+
+    elif operation == "divide_all":
+        user_transactions = get_calculations(limit=1000, user=from_user)
+        transaction_amounts = []
+        previous_balance = 0
+
+        for calc in reversed(user_transactions):
+            current_result = calc['result']
+            transaction_amount = current_result - previous_balance
+            transaction_amounts.append(transaction_amount)
+            previous_balance = current_result
+
+        if transaction_amounts:
+            result = transaction_amounts[0]
+            for amount in transaction_amounts[1:]:
+                if amount != 0:
+                    result /= amount
+        else:
+            result = 0
+
+        user_balances[from_user] = result
+        user_last_results[from_user] = result
+        global_last_result = result
+        result_text = f"{from_user} now has {result} (divided {len(transaction_amounts)} transactions)"
+
+        store_calculation(
+            query=transaction["original_text"],
+            operation=operation,
+            result=result,
+            user=from_user
+        )
+
+        return {
+            "result": result,
+            "message": result_text,
+            "users": dict(user_balances)
+        }
+
     elif operation == "add":
         user_balances[from_user] += amount
         user_last_results[from_user] = user_balances[from_user]
@@ -239,14 +351,13 @@ def execute_transaction(transaction):
         result_text = f"{from_user} now has {user_balances[from_user]}"
 
     elif operation == "takes_from" and to_user:
-        # When A takes from B: A gains, B loses
         if to_user not in user_balances:
             user_balances[to_user] = 0
         if to_user not in user_last_results:
             user_last_results[to_user] = 0
 
-        user_balances[from_user] += amount  # Taker gains
-        user_balances[to_user] -= amount    # Source loses
+        user_balances[from_user] += amount
+        user_balances[to_user] -= amount
 
         user_last_results[from_user] = user_balances[from_user]
         user_last_results[to_user] = user_balances[to_user]
@@ -269,7 +380,6 @@ def execute_transaction(transaction):
     else:
         result_text = f"Unknown operation"
 
-    # Only store in database for actual calculations, not show operations
     if operation != "show_total":
         store_calculation(
             query=transaction["original_text"],
@@ -278,7 +388,6 @@ def execute_transaction(transaction):
             user=from_user
         )
 
-        # For transfer operations, also store for the second user
         if operation in ["takes_from", "transfer"] and to_user:
             store_calculation(
                 query=f"{to_user} affected by: {transaction['original_text']}",
@@ -367,7 +476,6 @@ def handle_go_back(text):
         steps = int(numbers[0])
         user_transactions = get_calculations(limit=steps+1, user=username)
 
-        # Debug: show what transactions we found
         print(f"Debug: Found {len(user_transactions)} transactions for {username}")
         for i, t in enumerate(user_transactions[:steps+1]):
             print(f"  {i}: {t['query']} = {t['result']}")
