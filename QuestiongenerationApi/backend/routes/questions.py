@@ -10,7 +10,7 @@ def fetch_questions():
     if not text:
         return jsonify({'error': 'need text parameter'}), 400
 
-    if len(text.strip()) < 20:
+    if len(text.strip()) < 5:
         return jsonify({'error': 'text is too short'}), 400
 
     questions = extract_questions(text)
